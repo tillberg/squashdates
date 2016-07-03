@@ -8,11 +8,13 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/tillberg/ansi-log"
 	"github.com/tillberg/squashdates/squashdates"
+	"github.com/tillberg/squashdates/timeslice"
 )
 
 var Opts struct {
-	Quiet bool `short:"q" long:"quiet" description:"Only show day totals"`
-	Mech  bool `long:"mech" description:"Output # seconds followed by last time seen"`
+	Quiet bool   `short:"q" long:"quiet" description:"Only show day totals"`
+	Mech  bool   `long:"mech" description:"Output # seconds followed by last time seen"`
+	Since string `long:"since" description:"Only include dates after this"`
 }
 
 const DATE_PARSE_FORMAT_TZ = "2006-01-02T15:04:05-07:00"
@@ -49,6 +51,19 @@ func main() {
 	}
 
 	dates := squashdates.ReadDates(os.Stdin)
+
+	if Opts.Since != "" {
+		since, err := squashdates.ParseDate(Opts.Since)
+		alog.BailIf(err)
+		_dates := timeslice.TimeSlice{}
+		for _, date := range dates {
+			if date.After(since) || date == since {
+				_dates = append(_dates, date)
+			}
+		}
+		dates = _dates
+	}
+
 	totalDuration, mostRecent := squashdates.Squash(dates, Opts.Quiet)
 
 	if Opts.Mech {

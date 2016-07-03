@@ -14,6 +14,7 @@ import (
 
 const DATE_PARSE_FORMAT_TZ = "2006-01-02T15:04:05-07:00"
 const DATE_PARSE_FORMAT_UTC = "2006-01-02T15:04:05Z"
+const DATE_PARSE_FORMAT_SIMPLE = "Mon Jan _2 2006"
 
 const YEAR_FORMAT = "2006"
 const MONTH_FORMAT = "Jan 2006"
@@ -34,17 +35,27 @@ func formatDuration(duration time.Duration) string {
 	return fmt.Sprintf(durationFormat, duration.Hours())
 }
 
+func ParseDate(line string) (time.Time, error) {
+	dateStr := line
+	format := DATE_PARSE_FORMAT_SIMPLE
+	length := len(line)
+	if length >= len(DATE_PARSE_FORMAT_UTC) {
+		format = DATE_PARSE_FORMAT_UTC
+		if line[len(DATE_PARSE_FORMAT_UTC)-1] != 'Z' {
+			format = DATE_PARSE_FORMAT_TZ
+		}
+		dateStr = line[:len(format)]
+	}
+	return time.Parse(format, dateStr)
+}
+
 func ReadDates(reader io.Reader) timeslice.TimeSlice {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 	dates := timeslice.TimeSlice{}
 	for scanner.Scan() {
 		line := scanner.Text()
-		format := DATE_PARSE_FORMAT_TZ
-		if len(line) >= len(DATE_PARSE_FORMAT_UTC) && line[len(DATE_PARSE_FORMAT_UTC)-1] == 'Z' {
-			format = DATE_PARSE_FORMAT_UTC
-		}
-		date, err := time.Parse(format, line[:len(format)])
+		date, err := ParseDate(line)
 		if err != nil {
 			alog.Printf("@(warn:Error parsing date from %q: %s)\n", line, err)
 		} else {
@@ -141,6 +152,7 @@ func Squash(dates timeslice.TimeSlice, quiet bool) (totalDuration time.Duration,
 		currDaySpans = append(currDaySpans, [2]time.Time{spanStart, spanEnd})
 	}
 	for _, date := range dates {
+		date = date.Local()
 		// lg.Println(date)
 		start := date.Add(PAD_BEFORE)
 		end := date.Add(PAD_AFTER)
